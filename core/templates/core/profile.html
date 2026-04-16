@@ -1,0 +1,206 @@
+{% extends 'core/base.html' %}
+{% block title %}{{ target_user.get_full_name|default:target_user.username }}{% endblock %}
+
+{% block content %}
+
+<!-- Profile Hero -->
+<section class="profile-hero">
+  <div class="container">
+    <div class="profile-hero-content">
+      <div class="profile-avatar-wrap">
+        {% if profile_obj.profile_picture %}
+          <img src="{{ profile_obj.profile_picture.url }}" alt="{{ target_user.get_full_name }}" class="profile-avatar">
+        {% else %}
+          <div class="profile-avatar-placeholder">
+            {% if profile_obj.gender == 'M' %}👨‍🎓{% elif profile_obj.gender == 'F' %}👩‍🎓{% else %}🧑‍🎓{% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="profile-hero-info">
+        <h1 class="profile-hero-name">{{ target_user.get_full_name|default:target_user.username }}</h1>
+        <div class="profile-hero-meta">
+          {% if profile_obj.age %}<span>{{ profile_obj.age }} years old</span>{% endif %}
+          {% if profile_obj.gender %}<span>· {{ profile_obj.get_gender_display }}</span>{% endif %}
+          {% if profile_obj.campus %}<span class="profile-campus-tag">🎓 {{ profile_obj.campus.name }}</span>{% endif %}
+        </div>
+        {% if is_own_profile %}
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <a href="{% url 'edit_profile' %}" class="btn btn-primary">✏️ Edit Profile</a>
+            <a href="{% url 'manage_photos' %}" class="btn btn-outline" style="color:white;border-color:rgba(255,255,255,0.4);">📸 Manage Photos</a>
+          </div>
+        {% else %}
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+            <form class="like-form" method="POST" action="{% url 'like_user' target_user.pk %}" data-user-id="{{ target_user.pk }}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary {% if has_liked %}liked{% endif %}">
+                {% if has_liked %}❤️ Liked{% else %}🤍 Like{% endif %}
+              </button>
+            </form>
+            {% if match %}
+              <a href="{% url 'chat' match.pk %}" class="btn btn-outline" style="color:white;border-color:rgba(255,255,255,0.4);">💬 Message</a>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="container" style="padding-top:48px;padding-bottom:60px;">
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:32px;max-width:960px;">
+
+    <div>
+      <!-- Photo Gallery -->
+      {% with photos=target_user.photos.all %}
+      {% if photos %}
+        <div class="card" style="padding:28px;margin-bottom:24px;">
+          <h2 style="font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:16px;">📸 Photos</h2>
+          <div class="photo-gallery">
+            {% for photo in photos %}
+              <div class="gallery-item" onclick="openLightbox('{{ photo.image.url }}','{{ photo.caption|escapejs }}')">
+                <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Photo' }}" class="gallery-img">
+                {% if photo.caption %}<div class="gallery-caption">{{ photo.caption }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          {% if is_own_profile %}
+            <div style="margin-top:16px;text-align:right;">
+              <a href="{% url 'manage_photos' %}" class="btn btn-ghost btn-sm">+ Add / Edit Photos</a>
+            </div>
+          {% endif %}
+        </div>
+      {% elif is_own_profile %}
+        <div class="card" style="padding:28px;margin-bottom:24px;text-align:center;background:var(--rose-pale);">
+          <div style="font-size:2.5rem;margin-bottom:12px;">📸</div>
+          <p style="font-weight:600;color:var(--charcoal);margin-bottom:8px;">Add some photos!</p>
+          <p class="text-muted" style="margin-bottom:16px;">Profiles with photos get 3x more likes.</p>
+          <a href="{% url 'manage_photos' %}" class="btn btn-primary">Upload Photos</a>
+        </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Bio -->
+      {% if profile_obj.bio %}
+        <div class="card" style="padding:32px;margin-bottom:24px;">
+          <h2 style="font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:16px;">About Me</h2>
+          <p style="color:var(--slate);line-height:1.8;white-space:pre-line;">{{ profile_obj.bio }}</p>
+        </div>
+      {% endif %}
+
+      <!-- Interests: uses model method get_interests_list to avoid template split(',') bug -->
+      {% if profile_obj.interests %}
+        <div class="card" style="padding:32px;">
+          <h2 style="font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:16px;">Interests &amp; Hobbies</h2>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% for interest in profile_obj.get_interests_list %}
+              <span style="background:var(--rose-pale);color:var(--rose);padding:6px 14px;border-radius:999px;font-size:0.88rem;font-weight:600;">
+                {{ interest }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if not profile_obj.bio and not profile_obj.interests %}
+        {% if is_own_profile %}
+          <div class="empty-state" style="padding:40px;">
+            <div class="empty-state-icon">📝</div>
+            <h3>Your Profile Looks Empty</h3>
+            <p>Add a bio and interests so others can get to know you!</p>
+            <a href="{% url 'edit_profile' %}" class="btn btn-primary">Complete Profile</a>
+          </div>
+        {% else %}
+          <div class="card" style="padding:32px;text-align:center;color:var(--muted);">
+            <p>This student hasn't added a bio yet.</p>
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- Right: Quick Info -->
+    <div>
+      <div class="card" style="padding:24px;">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;margin-bottom:16px;">Quick Info</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          {% if profile_obj.campus %}
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.3rem;">🎓</span>
+              <div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;">Campus</div>
+                <div style="font-weight:600;font-size:0.92rem;color:var(--charcoal);">{{ profile_obj.campus.name }}</div>
+              </div>
+            </div>
+          {% endif %}
+          {% if profile_obj.age %}
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.3rem;">🎂</span>
+              <div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;">Age</div>
+                <div style="font-weight:600;font-size:0.92rem;color:var(--charcoal);">{{ profile_obj.age }} years</div>
+              </div>
+            </div>
+          {% endif %}
+          {% if profile_obj.gender %}
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.3rem;">✨</span>
+              <div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;">Gender</div>
+                <div style="font-weight:600;font-size:0.92rem;color:var(--charcoal);">{{ profile_obj.get_gender_display }}</div>
+              </div>
+            </div>
+          {% endif %}
+          {% with photo_count=target_user.photos.count %}
+          {% if photo_count %}
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.3rem;">📷</span>
+              <div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;">Photos</div>
+                <div style="font-weight:600;font-size:0.92rem;color:var(--charcoal);">{{ photo_count }} photo{{ photo_count|pluralize }}</div>
+              </div>
+            </div>
+          {% endif %}
+          {% endwith %}
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.3rem;">📅</span>
+            <div>
+              <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;">Joined</div>
+              <div style="font-weight:600;font-size:0.92rem;color:var(--charcoal);">{{ profile_obj.created_at|date:"M Y" }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% if not is_own_profile and match %}
+        <div class="card" style="padding:24px;margin-top:16px;text-align:center;background:var(--rose-pale);border:2px solid var(--rose-light);">
+          <div style="font-size:2rem;margin-bottom:8px;">💕</div>
+          <p style="font-weight:700;color:var(--rose);font-size:0.95rem;">You're matched!</p>
+          <a href="{% url 'chat' match.pk %}" class="btn btn-primary btn-sm" style="margin-top:12px;">Open Chat</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:12px;" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="" style="max-width:90vw;max-height:80vh;border-radius:12px;object-fit:contain;">
+  <p id="lightboxCaption" style="color:rgba(255,255,255,0.8);font-size:0.95rem;"></p>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openLightbox(url,caption){
+  const lb=document.getElementById('lightbox');
+  document.getElementById('lightboxImg').src=url;
+  document.getElementById('lightboxCaption').textContent=caption;
+  lb.style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeLightbox(){
+  document.getElementById('lightbox').style.display='none';
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLightbox();});
+</script>
+{% endblock %}

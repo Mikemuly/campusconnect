@@ -1,0 +1,131 @@
+{% extends 'core/base.html' %}
+{% block title %}Manage Photos{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:820px;padding-top:48px;padding-bottom:60px;">
+
+  <div style="margin-bottom:32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+    <div>
+      <h1 class="page-title">📸 Manage Photos</h1>
+      <p class="page-subtitle">{{ slots_used }}/6 photo slots used</p>
+    </div>
+    <a href="{% url 'profile_self' %}" class="btn btn-ghost">← Back to Profile</a>
+  </div>
+
+  <!-- Progress bar -->
+  <div style="background:var(--border);border-radius:999px;height:8px;margin-bottom:32px;overflow:hidden;">
+    <div style="background:var(--rose);height:100%;width:{% widthratio slots_used 6 100 %}%;transition:width 0.4s ease;border-radius:999px;"></div>
+  </div>
+
+  <!-- Existing Photos -->
+  {% if existing_photos %}
+    <div class="form-card" style="margin-bottom:32px;">
+      <h2 style="font-family:'Playfair Display',serif;font-size:1.2rem;margin-bottom:20px;">Your Photos</h2>
+      <div class="photo-manage-grid">
+        {% for photo in existing_photos %}
+          <div class="photo-manage-item">
+            <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Photo' }}" class="photo-manage-img">
+            {% if photo.caption %}
+              <p style="font-size:0.8rem;color:var(--muted);margin:6px 4px 0;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                {{ photo.caption }}
+              </p>
+            {% endif %}
+            <form method="POST" onsubmit="return confirm('Delete this photo?');">
+              {% csrf_token %}
+              <input type="hidden" name="delete_photo" value="{{ photo.pk }}">
+              <button type="submit" class="photo-delete-btn">🗑 Delete</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Upload New Photos -->
+  {% if slots_free > 0 %}
+    <div class="form-card">
+      <h2 style="font-family:'Playfair Display',serif;font-size:1.2rem;margin-bottom:8px;">
+        Upload Photos
+        <span style="font-size:0.85rem;font-weight:400;color:var(--muted);">({{ slots_free }} slot{{ slots_free|pluralize }} remaining)</span>
+      </h2>
+      <p class="text-muted" style="margin-bottom:24px;">You can upload up to {{ slots_free }} more photo{{ slots_free|pluralize }}. Each photo can have an optional caption.</p>
+
+      <form method="POST" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        <div class="upload-slots-grid">
+          {% for i in "123456" %}
+            {% with slot_num=forloop.counter %}
+            {% if slot_num <= slots_free %}
+              <div class="upload-slot" id="slot-{{ slot_num }}">
+                <div class="upload-slot-preview" id="preview-{{ slot_num }}">
+                  <div class="upload-slot-placeholder">
+                    <span style="font-size:2rem;">📷</span>
+                    <span style="font-size:0.8rem;color:var(--muted);">Click to choose</span>
+                  </div>
+                  <img id="previewImg-{{ slot_num }}" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:12px;">
+                </div>
+                <label style="cursor:pointer;display:block;">
+                  <input type="file" name="photo_{{ slot_num }}" accept="image/*" class="photo-file-input"
+                         data-slot="{{ slot_num }}" style="display:none;">
+                  <div class="upload-slot-btn">Choose Photo</div>
+                </label>
+                <input type="text" name="caption_{{ slot_num }}" placeholder="Add a caption (optional)"
+                       class="form-input" style="margin-top:8px;font-size:0.85rem;padding:8px 12px;">
+                {% if form %}
+                  {% for err in form.errors|dictsort:0 %}{% endfor %}
+                {% endif %}
+              </div>
+            {% endif %}
+            {% endwith %}
+          {% endfor %}
+        </div>
+
+        <div style="margin-top:24px;display:flex;gap:12px;align-items:center;">
+          <button type="submit" class="btn btn-primary btn-lg">⬆️ Upload Selected Photos</button>
+          <span class="text-muted" style="font-size:0.85rem;">Max 8MB per photo · JPEG/PNG/GIF/WEBP</span>
+        </div>
+      </form>
+    </div>
+  {% else %}
+    <div class="form-card" style="text-align:center;padding:40px;background:var(--rose-pale);">
+      <div style="font-size:2.5rem;margin-bottom:12px;">✅</div>
+      <h3 style="font-family:'Playfair Display',serif;margin-bottom:8px;">All 6 slots filled!</h3>
+      <p class="text-muted">Delete a photo above to make room for a new one.</p>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Preview selected images before uploading
+document.querySelectorAll('.photo-file-input').forEach(input => {
+  input.addEventListener('change', function() {
+    const slot = this.dataset.slot;
+    const preview = document.getElementById('previewImg-' + slot);
+    const placeholder = this.closest('.upload-slot').querySelector('.upload-slot-placeholder');
+    if (this.files && this.files[0]) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+      };
+      reader.readAsDataURL(this.files[0]);
+    }
+  });
+});
+
+// Clicking anywhere on the slot preview triggers the file input
+document.querySelectorAll('.upload-slot-preview').forEach(previewDiv => {
+  previewDiv.addEventListener('click', function() {
+    const slot = this.id.replace('preview-', '');
+    const input = document.querySelector(`.photo-file-input[data-slot="${slot}"]`);
+    if (input) input.click();
+  });
+  previewDiv.style.cursor = 'pointer';
+});
+</script>
+{% endblock %}
